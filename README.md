@@ -1,79 +1,77 @@
-# 🚀 Real-Time IoT Data Pipeline | Confluent MQTT
+Real-Time IoT Monitoring Pipeline
 
-> **Production-ready streaming data architecture** showcasing modern data engineering practices with **Apache Spark**, **MQTT**, **InfluxDB**, and **Docker**
+MQTT → Kafka → Spark → InfluxDB → Grafana
 
-## 🎯 Project Highlights
+This project implements a complete real-time data processing pipeline designed for IoT sensor analytics. It ingests live sensor readings, streams them through Kafka, processes them using Spark Structured Streaming, stores them in InfluxDB, and visualizes them via Grafana dashboards and alert rules.
 
-**End-to-End Data Engineering Solution** demonstrating:
-- ⚡ **Real-time streaming** with Apache Spark & MQTT
-- 🏭 **Industrial IoT simulation** using Modbus protocol
-- 📊 **Time-series data storage** with InfluxDB
-- 🐳 **Containerized microservices** architecture
-- 📈 **Scalable data processing** pipeline
+ System Architecture
 
-## 🛠️ Tech Stack
+MQTT Sensor Simulator: Publishes voltage, current, and power readings.
 
-| Component | Technology | Purpose |
-|-----------|------------|----------|
-| **Streaming Engine** | Apache Spark | Real-time data processing |
-| **Message Broker** | MQTT (Mosquitto) | IoT device communication |
-| **Time-Series DB** | InfluxDB | High-performance data storage |
-| **Data Collection** | Telegraf | Metrics aggregation |
-| **Orchestration** | Docker Compose | Service management |
-| **Protocol Simulation** | Modbus | Industrial device emulation |
+Kafka Broker: Buffers messages in topic sensor-data.
 
-## 🏗️ Architecture Overview
+Spark Structured Streaming: Parses JSON, transforms records, and writes them to InfluxDB.
 
-```
-[Modbus Devices] → [MQTT Broker] → [Spark Streaming] → [InfluxDB] → [Analytics]
-       ↓              ↓              ↓              ↓
-   Simulated      Message Queue   Real-time      Time-series
-   Industrial     & Routing       Processing     Storage
-   Data
-```
+InfluxDB: Stores time-series data in bucket iot_data.
 
-## 🚀 Quick Start
+Grafana: Visualizes metrics and triggers alerts.
 
-**One-command deployment:**
-```bash
-docker-compose up -d
-```
+ Repository Structure
+/
+|-- docker-compose.yml
+|-- spark/
+|     |-- spark_streaming.py
+|
+|-- modbus-simulator/
+|     |-- mqtt_publisher.py
+|
+|-- config/
+|     |-- mosquitto.conf
+|     |-- telegraf.conf
+|
+|-- screenshots/
+|     |-- architecture.png
+|     |-- mqtt_logs.png
+|     |-- kafka_stream.png
+|     |-- spark_logs.png
+|     |-- influxdb_graph.png
+|     |-- grafana_dashboard.png
+|     |-- grafana_alerts.png
+|
+|-- README.md
 
-**What gets deployed:**
-- MQTT broker with custom configuration
-- Modbus device simulators generating realistic IoT data
-- Spark streaming application processing data in real-time
-- InfluxDB instance for time-series storage
-- Telegraf for metrics collection
+ How to Run the Pipeline
+1. Start all services
+docker compose up -d
 
-## 📁 Project Structure
+2. View Spark logs
+docker logs spark --follow
 
-```
-confluent-mqtt/
-├── modbus-simulator/     # Industrial device simulation
-├── mqtt-forwarder/       # MQTT message routing
-├── spark/               # Real-time data processing
-├── New folder/          # Jupyter development notebooks
-├── docker-compose.yml   # Service orchestration
-├── mosquitto.conf      # MQTT broker config
-└── telegraf.conf       # Metrics collection config
-```
+3. Test Kafka consumer
+kafka-console-consumer --bootstrap-server kafka:9092 --topic sensor-data
 
-## 💡 Key Features
+4. Open InfluxDB
 
-- **Scalable Architecture**: Microservices design for horizontal scaling
-- **Real-time Processing**: Sub-second data processing with Spark Streaming
-- **Industrial Standards**: Modbus protocol implementation
-- **Production Ready**: Docker containerization with proper configurations
-- **Monitoring Ready**: Built-in metrics collection with Telegraf
-- **Development Friendly**: Jupyter notebooks for experimentation
+URL: http://localhost:8086
 
-## 🎯 Perfect for Data Engineers who want to see:
-- Modern streaming data architectures
-- IoT data pipeline implementation
-- Docker-based service orchestration
-- Real-time analytics capabilities
-- Industrial protocol integration
+Bucket: iot_data
 
----
-*This project demonstrates practical experience with production-grade data engineering tools and real-time streaming architectures.*
+5. Open Grafana
+
+URL: http://localhost:4000
+
+View dashboard + alerts.
+
+Dashboard and Alerts
+
+Grafana visualizes:
+
+Voltage (V_L1)
+
+Current (I_L1)
+
+Active Power (P_L1)
+
+Apparent Power (VA_L1)
+
+Alerts notify when values fall outside thresholds.
