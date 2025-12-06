@@ -1,0 +1,4 @@
+# requirements.txt
+pyspark==3.2.2
+influxdb-client
+pika

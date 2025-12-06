@@ -1,0 +1,168 @@
+
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: always
+    networks:
+      - mqtt-kafka-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 1883"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    restart: always
+    networks:
+      - mqtt-kafka-net
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"      # internal client
+      - "19092:19092"    # host access
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,OUTSIDE://localhost:19092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,OUTSIDE:PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    restart: always
+    networks:
+      - mqtt-kafka-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 20s
+      timeout: 20s
+      start_period: 120s   # <- Give Kafka time to boot
+      retries: 15
+
+      
+  #Telagraf
+  telegraf:
+    image: telegraf:1.30
+    container_name: telegraf
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    networks:
+      - mqtt-kafka-net
+
+  # InfluxDB
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpass
+      DOCKER_INFLUXDB_INIT_ORG: myorg
+      DOCKER_INFLUXDB_INIT_BUCKET: iot_data
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: admintoken
+    volumes:
+      - influxdb-storage:/var/lib/influxdb2
+    restart: always
+    networks:
+      - mqtt-kafka-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8086/health | grep \"pass\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "4000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    restart: always
+    networks:
+      - mqtt-kafka-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:3000/login | grep grafana"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      
+  #PySpark
+  spark:
+    build:
+      context: ./spark      
+      dockerfile: Dockerfile 
+    depends_on:
+      - kafka
+      - influxdb
+    environment:
+      INFLUX_URL:    "http://influxdb:8086"
+      INFLUX_TOKEN:  "admintoken"
+      INFLUX_ORG:    "myorg"
+      INFLUX_BUCKET: "iot_data"
+    ports:
+    - "4040:4040"
+    networks:
+      - mqtt-kafka-net
+
+      
+  # Modbus Simulator
+  modbus-simulator:
+    build: ./modbus-simulator
+    container_name: modbus-simulator
+    command: >
+      bash -c "pip install pymodbus==2.5.3 && python /app/modbus_simulator.py"
+    ports:
+      - "502:502"
+    networks:
+      - mqtt-kafka-net
+
+  # MQTT Forwarder
+  mqtt-forwarder:
+    build: ./mqtt-forwarder
+    container_name: mqtt-forwarder
+    depends_on:
+      - modbus-simulator
+      - mosquitto
+    networks:
+      - mqtt-kafka-net
+volumes:
+  influxdb-storage:
+  grafana-storage:
+
+networks:
+  mqtt-kafka-net:
+    external: true
+
